@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ParadiseTeam</title>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@300;500;700;900&display=swap" rel="stylesheet">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <style>
+        :root {
+            --bg: #020202;
+            --accent: #a855f7;
+            --accent-glow: rgba(168, 85, 247, 0.6);
+            --text: #ffffff;
+            --glass: rgba(255, 255, 255, 0.02);
+            --border: rgba(255, 255, 255, 0.07);
+            --font: 'Unbounded', sans-serif;
+        }
+
+        *, *::before, *::after {
+            margin: 0; padding: 0; box-sizing: border-box;
+            cursor: none !important;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: var(--font);
+            overflow-x: hidden;
+            background: #000;
+        }
+
+        #canvas-container {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 1; 
+            pointer-events: none; 
+            background: radial-gradient(circle at 50% 50%, #0d041a 0%, #020202 100%);
+        }
+
+        #cursor {
+            width: 10px; height: 10px; background: #fff; border-radius: 50%;
+            position: fixed; pointer-events: none; z-index: 30000;
+            transition: transform 0.1s ease-out; mix-blend-mode: difference;
+        }
+        #cursor-follower {
+            width: 40px; height: 40px; border: 1px solid var(--accent); border-radius: 50%;
+            position: fixed; pointer-events: none; z-index: 30000;
+            transition: transform 0.2s ease-out, top 0.2s ease-out, left 0.2s ease-out;
+        }
+
+        nav {
+            padding: 30px 6%; display: flex; justify-content: space-between; align-items: center;
+            position: fixed; width: 100%; top: 0; z-index: 9999;
+            pointer-events: auto;
+        }
+
+        .logo { font-weight: 900; font-size: 1.4rem; letter-spacing: -1.5px; text-transform: uppercase; }
+        .logo span { color: var(--accent); text-shadow: 0 0 20px var(--accent-glow); }
+
+        .container { 
+            max-width: 1200px; margin: 0 auto; 
+            padding: 180px 20px 100px; 
+            position: relative; 
+            z-index: 10; 
+            pointer-events: auto;
+        }
+
+        header h1 {
+            font-size: clamp(2.5rem, 10vw, 5.5rem); font-weight: 900; text-transform: uppercase;
+            line-height: 0.8; margin-bottom: 60px; text-align: center;
+            background: linear-gradient(to bottom, #fff 40%, var(--accent));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+
+        .tabs {
+            display: flex; justify-content: center; gap: 10px; margin-bottom: 80px;
+            background: rgba(255,255,255,0.03); padding: 8px; border-radius: 100px;
+            width: fit-content; margin-left: auto; margin-right: auto;
+            border: 1px solid var(--border); backdrop-filter: blur(10px);
+        }
+
+        .tab-btn {
+            background: transparent; border: none; padding: 14px 28px; border-radius: 100px;
+            color: rgba(255,255,255,0.4); font-family: var(--font); font-weight: 700;
+            font-size: 0.7rem; transition: 0.4s;
+        }
+
+        .tab-btn.active { background: var(--accent); color: #fff; box-shadow: 0 0 30px var(--accent-glow); }
+
+        .grid { display: none; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 30px; }
+        .grid.active { display: grid; }
+
+        .card {
+            background: var(--glass); border: 1px solid var(--border); border-radius: 40px;
+            padding: 50px 40px; backdrop-filter: blur(20px);
+            display: flex; flex-direction: column; align-items: center; text-align: center;
+            transition: 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+            position: relative;
+        }
+
+        .card:hover {
+            border-color: var(--accent); transform: translateY(-10px);
+            box-shadow: 0 30px 60px rgba(0,0,0,0.5);
+        }
+
+        .badge {
+            background: rgba(168, 85, 247, 0.15); color: var(--accent);
+            font-size: 0.6rem; padding: 8px 18px; border-radius: 100px;
+            margin-bottom: 25px; font-weight: 900; text-transform: uppercase;
+        }
+
+        .card h3 { font-size: 1.5rem; margin-bottom: 35px; font-weight: 900; letter-spacing: -1px; }
+
+        .subtext {
+            font-size: 0.7rem;
+            color: rgba(255,255,255,0.45);
+            margin-top: -22px;
+            margin-bottom: 22px;
+            line-height: 1.45;
+        }
+
+        .price-list { width: 100%; margin-bottom: 45px; }
+        .price-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 16px 0; border-bottom: 1px solid var(--border);
+            font-size: 0.85rem; font-weight: 500;
+        }
+        .price-item:last-child { border: none; }
+        .price-label { color: rgba(255,255,255,0.5); text-align: left; max-width: 60%; }
+        .price-val { font-weight: 700; color: #fff; text-align: right; }
+
+        .btn {
+            background: #fff; color: #000; width: 100%; padding: 22px;
+            border-radius: 24px; text-decoration: none; font-weight: 900;
+            font-size: 0.85rem; transition: 0.4s; text-transform: uppercase;
+            text-align: center;
+        }
+
+        .btn:hover { background: var(--accent); color: #fff; box-shadow: 0 0 40px var(--accent-glow); }
+
+        .strikethrough { text-decoration: line-through; opacity: 0.3; margin-right: 10px; }
+        .no-stock { color: #ff4444; font-weight: 900; }
+
+        .support-menu { position: relative; display: inline-block; }
+        .support-content {
+            display: none; position: absolute; right: 0; top: 100%;
+            background: rgba(15, 5, 25, 0.95); border: 1px solid var(--border);
+            border-radius: 20px; min-width: 220px; padding: 10px; backdrop-filter: blur(15px); z-index: 10000;
+        }
+        .support-menu:hover .support-content { display: block; }
+        .support-item {
+            display: flex; align-items: center; gap: 10px; padding: 12px 20px;
+            color: #fff; text-decoration: none; font-size: 0.7rem; font-weight: 700;
+            border-radius: 12px; transition: 0.3s;
+        }
+        .support-item:hover { background: var(--accent); }
+
+        .modal {
+            position: fixed;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0,0,0,0.65);
+            backdrop-filter: blur(10px);
+            z-index: 20000;
+            pointer-events: auto;
+        }
+        .modal.active { display: flex; }
+
+        .modal-card {
+            width: min(520px, 92vw);
+            background: rgba(15, 5, 25, 0.92);
+            border: 1px solid var(--border);
+            border-radius: 32px;
+            padding: 26px;
+            box-shadow: 0 40px 80px rgba(0,0,0,0.6);
+        }
+
+        .modal-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .modal-title {
+            font-weight: 900;
+            letter-spacing: -0.5px;
+            font-size: 1.1rem;
+        }
+
+        .modal-close {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: #fff;
+            padding: 10px 12px;
+            border-radius: 14px;
+            font-family: var(--font);
+            font-weight: 900;
+            font-size: 0.65rem;
+            transition: 0.3s;
+        }
+        .modal-close:hover {
+            border-color: var(--accent);
+            box-shadow: 0 0 25px var(--accent-glow);
+        }
+
+        .modal-sub {
+            font-size: 0.75rem;
+            color: rgba(255,255,255,0.55);
+            line-height: 1.5;
+            margin-bottom: 16px;
+        }
+
+        .contact-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .contact-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 16px 14px;
+            border-radius: 22px;
+            text-decoration: none;
+            font-weight: 900;
+            font-size: 0.8rem;
+            border: 1px solid var(--border);
+            background: rgba(255,255,255,0.03);
+            color: #fff;
+            transition: 0.35s;
+        }
+        .contact-btn:hover {
+            border-color: var(--accent);
+            background: rgba(168,85,247,0.18);
+            box-shadow: 0 0 35px var(--accent-glow);
+        }
+        .contact-btn svg { width: 20px; height: 20px; fill: currentColor; }
+
+        .modal-note {
+            margin-top: 14px;
+            font-size: 0.65rem;
+            color: rgba(255,255,255,0.35);
+            line-height: 1.5;
+        }
+
+        @media (max-width: 480px) {
+            .contact-grid { grid-template-columns: 1fr; }
+        }
+
+        footer {
+            margin-top: 100px; padding: 60px; font-size: 0.65rem; color: rgba(255,255,255,0.2);
+            text-align: center; letter-spacing: 2px; border-top: 1px solid var(--border);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .grid.active .card { animation: fadeIn 0.6s ease forwards; }
+    </style>
+</head>
+<body>
+
+    <div id="cursor"></div>
+    <div id="cursor-follower"></div>
+    <div id="canvas-container"></div>
+
+    <nav>
+        <div class="logo">PARADISE<span>TEAM</span></div>
+        <div style="display: flex; gap: 15px;">
+            <a href="https://discord.gg/eCE6tktwMn" target="_blank" class="tab-btn" style="text-decoration: none;">ОТЗЫВЫ</a>
+            <div class="support-menu">
+                <button class="tab-btn active">ПОДДЕРЖКА</button>
+                <div class="support-content">
+                    <a href="https://t.me/Parad1sSh0p" target="_blank" class="support-item"><i class="fab fa-telegram"></i> ТЕЛЕГРАМ</a>
+                    <a href="https://t.me/Parad1seTeamShop" target="_blank" class="support-item"><i class="fas fa-bullhorn"></i> НАШ КАНАЛ</a>
+                    <a href="https://discord.com/users/1170966492507017318" target="_blank" class="support-item"><i class="fab fa-discord"></i> ДИСКОРД</a>
+                    <a href="https://discord.gg/Cpqcs57M7H" target="_blank" class="support-item"><i class="fas fa-server"></i> ДС СЕРВЕР</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <header>
+            <h1>PARADISETEAM</h1>
+        </header>
+
+        <div class="tabs">
+            <button class="tab-btn active" onclick="openTab('discord')">ДИСКОРД</button>
+            <button class="tab-btn" onclick="openTab('telegram')">ТЕЛЕГРАМ</button>
+            <button class="tab-btn" onclick="openTab('gaming')">ИГРЫ</button>
+            <button class="tab-btn" onclick="openTab('steam')">СТИМ</button>
+        </div>
+
+        <!-- ДИСКОРД -->
+        <div id="discord" class="grid active">
+
+            <!-- Подписка Full Gift без слета -->
+            <div class="card">
+                <div class="badge">ГИФТ • БЕЗ СЛЕТОВ</div>
+                <h3>Full Gift</h3>
+                <p class="subtext">Для активации требуется VPN. У вас есть 48 часов на активацию.</p>
+                <div class="price-list">
+                    <div class="price-item"><span class="price-label">1 месяц</span><span class="price-val">750 ₽</span></div>
+                    <div class="price-item"><span class="price-label">1 год</span><span class="price-val">7000 ₽</span></div>
+                </div>
+                <a href="#" class="btn buy-btn" data-product="Discord • Full Gift (без слёта)">КУПИТЬ</a>
+            </div>
+
+            <!-- Подписка Full (со входом) -->
+            <div class="card">
+                <div class="badge">СО ВХОДОМ • ДЛЯ ВСЕХ</div>
+                <h3>Подписка Full</h3>
+                <p class="subtext">Подходит для всех аккаунтов. Товар выдаётся со входом на аккаунт.</p>
+                <div class="price-list">
+                    <div class="price-item"><span class="price-label">1 месяц</span><span class="price-val">400 ₽</span></div>
+                    <div class="price-item"><span class="price-label">2 месяца</span><span class="price-val">550 ₽</span></div>
+                    <div class="price-item"><span class="price-label">12 месяцев</span><span class="price-val">3500 ₽</span></div>
+                    <div class="price-item"><span class="price-label">13 месяцев</span><span class="price-val">3700 ₽</span></div>
+                </div>
+                <a href="#" class="btn buy-btn" data-product="Discord • Подписка Full (вход)">КУПИТЬ</a>
+            </div>
+
+            <!-- Подписка Full Trial (со входом) -->
+            <div class="card">
+                <div class="badge">ТРИАЛ • СО ВХОДОМ</div>
+                <h3>Подписка Full Trial</h3>
+                <p class="subtext">Только аккаунты старше 30 дней, без подписок ранее. Выдаётся со входом.</p>
+                <div class="price-list">
+                    <div class="price-item"><span class="price-label">1 месяц</span><span class="price-val no-stock"><span class="strikethrough">120 ₽</span> НЕТУ</span></div>
+                    <div class="price-item"><span class="price-label">2 месяца</span><span class="price-val no-stock"><span class="strikethrough">220 ₽</span> НЕТУ</span></div>
+                    <div class="price-item"><span class="price-label">3 месяца</span><span class="price-val">350 ₽</span></div>
+                    <div class="price-item"><span class="price-label">4 месяца</span><span class="price-val">500 ₽</span></div>
+                    <div class="price-item"><span class="price-label">Активация вашей ссылки</span><span class="price-val">100 ₽</span></div>
+                </div>
+                <a href="#" class="btn buy-btn" data-product="Discord • Подписка Full Trial (вход)">КУПИТЬ</a>
+            </div>
+
+            <!-- Ссылки для Подписок Full Trial -->
+            <div class="card">
+                <div class="badge">ССЫЛКА • TRIAL</div>
+                <h3>Ссылка Full Trial</h3>
+                <p class="subtext">Рабочая ссылка. Активировать можно только зарубежными картами.</p>
+                <div class="price-list">
+                    <div class="price-item"><span class="price-label">1 месяц</span><span class="price-val no-stock"><span class="strikethrough">50 ₽</span> НЕТУ</span></div>
+                    <div class="price-item"><span class="price-label">3 месяца</span><span class="price-val">150 ₽</span></div>
+                </div>
+                <a href="#" class="btn buy-btn" data-product="Discord • Ссылка Full Trial">КУПИТЬ</a>
+            </div>
+
+            <!-- Подписка Full Gift с шансом слета -->
+            <div class="card">
+                <div class="badge">ГИФТ • ШАНС СЛЕТА</div>
+                <h3>Full Gift (Chance)</h3>
+                <p class="subtext">Требуется VPN. На активацию ~ 1 час.</p>
+                <div class="price-list">
+                    <div class="price-item"><span class="price-label">1 месяц (без гарантии)</span><span class="price-val">250 ₽</span></div>
+                    <div class="price-item"><span class="price-label">1 год (без гарантии)</span><span class="price-val">1100 ₽</span></div>
+                    <div class="price-item"><span class="price-label">1 месяц (с гарантией)</span><span class="price-val">420 ₽</span></div>
+                </div>
+                <a href="#" class="btn buy-btn" data-product="Discord • Full Gift (шанс слёта)">КУПИТЬ</a>
+            </div>
+
+            <!-- Boosts -->
+            <div class="card">
+                <div class="badge">БУСТЫ</div>
+                <h3>Boost`s на сервер</h3>
+                <p class="subtext">Количество товара — только чётное: 2, 4, 6 и т.д. Аккаунты не кикать.</p>
+                <div class="price-list">
+                    <div class="price-item"><span class="price-label">1 месяц (2 буста)</span><span class="price-val">60 ₽</span></div>
+                    <div class="price-item"><span class="price-label">3 месяца (2 буста)</span><span class="price-val">180 ₽</span></div>
+                    <div class="price-item"><span class="price-label">6 месяцев (2 буста)</span><span class="price-val">320 ₽</span></div>
+                    <div class="price-item"><span class="price-label">12 месяцев (2 буста)</span><span class="price-val">640 ₽</span></div>
+                </div>
+                <a href="#" class="btn buy-btn" data-product="Discord • Boost`s на сервер">КУПИТЬ</a>
+            </div>
+
+            <!-- Украшения -->
+            <div class="card">
+                <div class="badge">УКРАШЕНИЯ</div>
+                <h3>Discord Украшения</h3>
+                <p class="subtext">Цены уточняйте у селлера (по запросу).</p>
+                <div class="price-list">
+                    <div class="price-item"><span class="price-label">Любые украшения</span><span class="price-val">Уточнить</span></div>
+                </div>
+                <a href="#" class="btn buy-btn" data-product="Discord • Украшения (цены уточнить)">УЗНАТЬ ЦЕНУ</a>
+            </div>
+
+        </div>
+
+        <!-- ТЕЛЕГРАМ -->
+        <div id="telegram" class="grid">
+            <div class="card">
+                <div class="badge">💫 ЗВЕЗДЫ • КУРС 1.4₽</div>
+                <h3>Telegram Stars</h3>
+                <div class="price-list">
+                    <div class="price-item"><span class="price-label">50 🌟</span><span class="price-val">70 ₽</span></div>
+                    <div class="price-item"><span class="price-label">100 🌟</span><span class="price-val">140 ₽</span></div>
+                    <div class="price-item"><span class="price-label">300 🌟</span><span class="price-val">420 ₽</span></div>
+                    <div class="price-item"><span class="price-label">500 🌟</span><span class="price-val">700 ₽</span></div>
+                    <div class="price-item"><span class="price-label">1000 🌟 (1.3₽/шт)</span><span class="price-val">1300 ₽</span></div>
+                    <div class="price-item"><span class="price-label">5000 🌟 (1.3₽/шт)</span><span class="price-val">6500 ₽</span></div>
+                </div>
+                <a href="#" class="btn buy-btn" data-product="Telegram • Stars">КУПИТЬ</a>
+            </div>
+
+            <div class="card">
+                <div class="badge">ПРЕМИУМ</div>
+                <h3>Telegram Premium</h3>
+                <p class="subtext">Актуальные акции на Premium подарком.</p>
+                <div class="price-list">
+                    <div class="price-item"><span class="price-label">3 месяца</span><span class="price-val">1000 ₽</span></div>
+                    <div class="price-item"><span class="price-label">6 месяцев</span><span class="price-val">1300 ₽</span></div>
+                    <div class="price-item"><span class="price-label">12 месяцев</span><span class="price-val">2400 ₽</span></div>
+                </div>
+                <a href="#" class="btn buy-btn" data-product="Telegram • Premium (подарок)">КУПИТЬ</a>
+            </div>
+        </div>
+
+        <!-- ИГРЫ -->
+        <div id="gaming" class="grid">
+            <div class="card">
+                <div class="badge">BRAWL STARS</div>
+                <h3>Brawl Stars Gems</h3>
+                <p class="subtext">Товар выдаётся со входом на аккаунт. Возможна и другая сумма.</p>
+                <div class="price-list">
+                    <div class="price-item"><span class="price-label">30 гемов</span><span class="price-val">250 ₽</span></div>
+                    <div class="price-item"><span class="price-label">80 гемов</span><span class="price-val">500 ₽</span></div>
+                    <div class="price-item"><span class="price-label">360 гемов</span><span class="price-val">1700 ₽</span></div>
+                    <div class="price-item"><span class="price-label">950 гемов</span><span class="price-val">5000 ₽</span></div>
+                </div>
+                <a href="#" class="btn buy-btn" data-product="Brawl Stars • Gems">КУПИТЬ</a>
+            </div>
+
+            <div class="card">
+                <div class="badge">BRAWL STARS</div>
+                <h3>Brawl Pass</h3>
+                <div class="price-list">
+                    <div class="price-item"><span class="price-label">Brawl Pass (с «Особой скидкой»)</span><span class="price-val">360 ₽</span></div>
+                    <div class="price-item"><span class="price-label">Brawl Pass (без акции)</span><span class="price-val">700 ₽</span></div>
+                    <div class="price-item"><span class="price-label">Brawl Pass Plus (с «Особой скидкой»)</span><span class="price-val">760 ₽</span></div>
+                    <div class="price-item"><span class="price-label">Brawl Pass Plus (без акции)</span><span class="price-val">1100 ₽</span></div>
+                    <div class="price-item"><span class="price-label">Улучшение до Brawl Pass Plus</span><span class="price-val">360 ₽</span></div>
+                    <div class="price-item"><span class="price-label">Pro Pass</span><span class="price-val">2200 ₽</span></div>
+                </div>
+                <a href="#" class="btn buy-btn" data-product="Brawl Stars • Pass">КУПИТЬ</a>
+            </div>
+
+            <div class="card">
+                <div class="badge">CLASH ROYALE</div>
+                <h3>Clash Royale Gems</h3>
+                <p class="subtext">Товар выдаётся со входом на аккаунт. Возможна и другая сумма.</p>
+                <div class="price-list">
+                    <div class="price-item"><span class="price-label">80 гемов</span><span class="price-val">100 ₽</span></div>
+                    <div class="price-item"><span class="price-label">1200 гемов</span><span class="price-val">750 ₽</span></div>
+                    <div class="price-item"><span class="price-label">6500 гемов</span><span class="price-val">3700 ₽</span></div>
+                    <div class="price-item"><span class="price-label">14000 гемов</span><span class="price-val">8300 ₽</span></div>
+                </div>
+                <a href="#" class="btn buy-btn" data-product="Clash Royale • Gems">КУПИТЬ</a>
+            </div>
+
+            <div class="card">
+                <div class="badge">CLASH ROYALE</div>
+                <h3>Pass Royale</h3>
+                <div class="price-list">
+                    <div class="price-item"><span class="price-label">Pass Royale</span><span class="price-val">1000 ₽</span></div>
+                </div>
+                <a href="#" class="btn buy-btn" data-product="Clash Royale • Pass Royale">КУПИТЬ</a>
+            </div>
+
+            <div class="card">
+                <div class="badge">CLASH OF CLANS</div>
+                <h3>Clash of Clans Gems</h3>
+                <p class="subtext">Товар выдаётся со входом на аккаунт. Возможна и другая сумма.</p>
+                <div class="price-list">
+                    <div class="price-item"><span class="price-label">80 гемов</span><span class="price-val">100 ₽</span></div>
+                    <div class="price-item"><span class="price-label">1200 гемов</span><span class="price-val">750 ₽</span></div>
+                    <div class="price-item"><span class="price-label">6500 гемов</span><span class="price-val">3700 ₽</span></div>
+                    <div class="price-item"><span class="price-label">14000 гемов</span><span class="price-val">8300 ₽</span></div>
+                </div>
+                <a href="#" class="btn buy-btn" data-product="Clash of Clans • Gems">КУПИТЬ</a>
+            </div>
+
+            <div class="card">
+                <div class="badge">CLASH OF CLANS</div>
+                <h3>Золотой пропуск</h3>
+                <div class="price-list">
+                    <div class="price-item"><span class="price-label">С акцией «Особая скидка»</span><span class="price-val">450 ₽</span></div>
+                    <div class="price-item"><span class="price-label">Без акции</span><span class="price-val">1000 ₽</span></div>
+                </div>
+                <a href="#" class="btn buy-btn" data-product="Clash of Clans • Золотой пропуск">КУПИТЬ</a>
+            </div>
+
+            <div class="card">
+                <div class="badge">MINECRAFT</div>
+                <h3>Java & Bedrock</h3>
+                <div class="price-list">
+                    <div class="price-item"><span class="price-label">Полный доступ (Лицензия)</span><span class="price-val">699 ₽</span></div>
+                </div>
+                <a href="#" class="btn buy-btn" data-product="Minecraft • Аккаунт">КУПИТЬ</a>
+            </div>
+        </div>
+
+        <!-- СТИМ -->
+        <div id="steam" class="grid">
+            <div class="card">
+                <div class="badge">ПОПОЛНЕНИЕ</div>
+                <h3>Steam Wallet</h3>
+                <div class="price-list">
+                    <div class="price-item"><span class="price-label">Курс</span><span class="price-val">1₽ Steam = 1.1₽</span></div>
+                    <div class="price-item"><span class="price-label">Мин. сумма</span><span class="price-val">100 ₽</span></div>
+                </div>
+                <a href="#" class="btn buy-btn" data-product="Steam • Пополнение баланса">ПОПОЛНИТЬ</a>
+            </div>
+
+            <div class="card">
+                <div class="badge">ДОПОЛНИТЕЛЬНО</div>
+                <h3>Индивидуальные заказы</h3>
+                <p class="subtext">По особым акциям и скидкам на аккаунте тоже можно заказать. Откройте тикет и пришлите скриншот товара.</p>
+                <div class="price-list">
+                    <div class="price-item"><span class="price-label">Статус</span><span class="price-val">По запросу</span></div>
+                </div>
+                <a href="#" class="btn buy-btn" data-product="Индивидуальный заказ / акция">ОТКРЫТЬ ТИКЕТ</a>
+            </div>
+        </div>
+
+        <footer>
+            PARADISETEAM НЕ СВЯЗАН С DISCORD INC. И TELEGRAM FZ-LLC. ВСЕ ПРАВА ЗАЩИЩЕНЫ.
+        </footer>
+    </div>
+
+    <!-- Модалка выбора связи -->
+    <div id="contact-modal" class="modal" aria-hidden="true">
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+            <div class="modal-top">
+                <div class="modal-title" id="modal-title">Куда написать?</div>
+                <button class="modal-close" id="modal-close" type="button">ЗАКРЫТЬ</button>
+            </div>
+            <div class="modal-sub" id="modal-sub">Выберите, где связаться с селлером по товару: <b id="modal-product">—</b></div>
+
+            <div class="contact-grid">
+                <a id="contact-tg" class="contact-btn" target="_blank" rel="noopener">
+                    <!-- Telegram SVG -->
+                    <i class="fab fa-telegram"></i>
+                    TELEGRAM
+                </a>
+
+                <a id="contact-ds" class="contact-btn" target="_blank" rel="noopener">
+                    <!-- Discord SVG -->
+                    <i class="fab fa-discord"></i>
+                    DISCORD
+                </a>
+            </div>
+
+            <div class="modal-note">Нажми на кнопку — откроется чат. Если нужно, просто отправь название товара из окна.</div>
+        </div>
+    </div>
+
+    <script>
+        let scene, camera, renderer, particles;
+
+        function init3D() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+            const geometry = new THREE.IcosahedronGeometry(1, 0);
+            const material = new THREE.MeshPhongMaterial({ color: 0xa855f7, wireframe: true });
+
+            particles = new THREE.Group();
+            for(let i=0; i<35; i++) {
+                const mesh = new THREE.Mesh(geometry, material);
+
+                mesh.position.set(
+                    (Math.random()-0.5)*18,
+                    (Math.random()-0.5)*18,
+                    (Math.random()-0.5)*18
+                );
+
+                mesh.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, 0);
+                mesh.scale.setScalar(Math.random()*1.2 + 0.5);
+                particles.add(mesh);
+            }
+            scene.add(particles);
+
+            const light = new THREE.PointLight(0xffffff, 1.5, 100);
+            light.position.set(10, 10, 10);
+            scene.add(light);
+            scene.add(new THREE.AmbientLight(0x404040));
+            camera.position.z = 9.5;
+        }
+
+        function animate3D() {
+            requestAnimationFrame(animate3D);
+            particles.rotation.y += 0.001;
+            particles.children.forEach(p => {
+                p.rotation.x += 0.005;
+                p.rotation.y += 0.005;
+            });
+            renderer.render(scene, camera);
+        }
+
+        function openTab(id) {
+            document.querySelectorAll('.grid').forEach(g => g.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            event.currentTarget.classList.add('active');
+        }
+
+        const cursor = document.getElementById('cursor');
+        const follower = document.getElementById('cursor-follower');
+
+        document.addEventListener('mousemove', (e) => {
+            cursor.style.left = e.clientX + 'px';
+            cursor.style.top = e.clientY + 'px';
+            follower.style.left = e.clientX - 15 + 'px';
+            follower.style.top = e.clientY - 15 + 'px';
+
+            if(particles) {
+                particles.rotation.x = (e.clientY / window.innerHeight - 0.5) * 0.4;
+                particles.rotation.y = (e.clientX / window.innerWidth - 0.5) * 0.4;
+            }
+        });
+
+        document.querySelectorAll('a, button, .support-item').forEach(el => {
+            el.addEventListener('mouseenter', () => follower.style.transform = 'scale(2)');
+            el.addEventListener('mouseleave', () => follower.style.transform = 'scale(1)');
+        });
+
+        const TG_LINK = "https://t.me/Parad1sSh0p";
+        const DS_LINK = "https://discord.com/users/1170966492507017318";
+
+        const modal = document.getElementById('contact-modal');
+        const modalClose = document.getElementById('modal-close');
+        const modalProduct = document.getElementById('modal-product');
+        const contactTg = document.getElementById('contact-tg');
+        const contactDs = document.getElementById('contact-ds');
+
+        function openContactModal(productName) {
+            modalProduct.textContent = productName || '—';
+            contactTg.href = TG_LINK;
+            contactDs.href = DS_LINK;
+            modal.classList.add('active');
+            modal.setAttribute('aria-hidden', 'false');
+        }
+
+        function closeContactModal() {
+            modal.classList.remove('active');
+            modal.setAttribute('aria-hidden', 'true');
+        }
+
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) closeContactModal();
+        });
+
+        modalClose.addEventListener('click', closeContactModal);
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && modal.classList.contains('active')) closeContactModal();
+        });
+
+        document.querySelectorAll('.buy-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                openContactModal(btn.getAttribute('data-product') || 'товар');
+            });
+        });
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        init3D();
+        animate3D();
+    </script>
+</body>
+</html>
